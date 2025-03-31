@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Secure Password Generator</title>
+    <style>
+        body {
+            font-family: 'Poppins', sans-serif;
+            background: url("{{ url_for('static', filename='images/background.webp') }}") no-repeat center center/cover;
+            text-align: center;
+            margin: 0;
+            padding: 0;
+            color: #fff;
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            position: relative;
+        }
+        body::before {
+            content: "";
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.6);
+            z-index: -1;
+        }
+        .container {
+            width: 90%;
+            max-width: 500px;
+            background: rgba(0, 0, 0, 0.85);
+            padding: 25px;
+            border-radius: 12px;
+            box-shadow: 0px 4px 20px rgba(255, 255, 255, 0.2);
+            text-align: center;
+        }
+        h2 {
+            color: #4CAF50;
+            font-size: 24px;
+            margin-bottom: 15px;
+        }
+        label {
+            font-weight: bold;
+            display: block;
+            font-size: 16px;
+            color: #fff;
+            text-align: left;
+            margin-left: 5px;
+        }
+        input[type="number"] {
+            width: 80%;
+            padding: 12px;
+            margin: 8px 0 16px;
+            border-radius: 6px;
+            border: 1px solid #4CAF50;
+            font-size: 16px;
+            text-align: center;
+            background: rgba(255, 255, 255, 0.2);
+            color: #fff;
+        }
+        .checkbox-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+        }
+        .checkbox-container {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+        input[type="checkbox"] {
+            appearance: none;
+            width: 18px;
+            height: 18px;
+            border: 2px solid #4CAF50;
+            border-radius: 4px;
+            margin-right: 8px;
+            cursor: pointer;
+            position: relative;
+            vertical-align: middle;
+        }
+        input[type="checkbox"]:checked {
+            background-color: #4CAF50;
+        }
+        input[type="checkbox"]::after {
+            content: '✓';
+            font-size: 14px;
+            font-weight: bold;
+            color: white;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            display: none;
+        }
+        input[type="checkbox"]:checked::after {
+            display: block;
+        }
+        button {
+            width: 100%;
+            padding: 12px;
+            margin-top: 20px;
+            background: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            font-size: 18px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+        button:hover {
+            background: #2E8B57;
+        }
+        #password {
+            font-size: 18px;
+            font-weight: bold;
+            color: #fff;
+            margin-top: 15px;
+            padding: 10px;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 6px;
+            display: inline-block;
+            word-wrap: break-word;
+            max-width: 100%;
+        }
+        fieldset {
+            border: 1px solid #4CAF50;
+            border-radius: 8px;
+            padding: 15px;
+            margin-top: 15px;
+        }
+        legend {
+            padding: 0 10px;
+            font-weight: bold;
+            color: #4CAF50;
+        }
+    </style>
+    <script>
+        async function generatePassword() {
+            const length = document.getElementById("length").value;
+            const options = {
+                use_digits: document.getElementById("useDigits").checked,
+                use_math_symbols: document.getElementById("useMathSymbols").checked,
+                use_currency: document.getElementById("useCurrency").checked,
+                use_punctuation: document.getElementById("usePunctuation").checked,
+                use_greek_letters: document.getElementById("useGreekLetters").checked,
+                use_ascii_art: document.getElementById("useAsciiArt").checked,
+                use_leet_speak: document.getElementById("useLeetSpeak").checked,
+                use_brackets: document.getElementById("useBrackets").checked
+            };
+            const response = await fetch('/generate', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ length: parseInt(length), ...options })
+            });
+            const data = await response.json();
+            document.getElementById("password").innerHTML = response.ok ? `Generated Password: ${data.password}` : `Error: ${data.error}`;
+        }
+    </script>
+</head>
+<body>
+    <div class="container">
+        <h2>Secure Password Generator</h2>
+        <label for="length">Password Length:</label>
+        <input type="number" id="length" value="12" min="8" max="32">
+        <fieldset>
+            <legend>Character Options</legend>
+            <div class="checkbox-grid">
+                <div class="checkbox-container">
+                    <label><input type="checkbox" id="useDigits" checked> Digits</label>
+                    <label><input type="checkbox" id="useMathSymbols"> Math Symbols </label>
+                    <label><input type="checkbox" id="useCurrency"> Currency Symbols </label>
+                    <label><input type="checkbox" id="usePunctuation"> Punctuation </label>
+                </div>
+                <div class="checkbox-container">
+                    <label><input type="checkbox" id="useGreekLetters"> Greek Letters (αβγδ)</label>
+                    <label><input type="checkbox" id="useAsciiArt"> ASCII Art Patterns</label>
+                    <label><input type="checkbox" id="useLeetSpeak"> Leet Speak (1337)</label>
+                    <label><input type="checkbox" id="useBrackets"> Brackets ({[<>]})</label>
+                </div>
+            </div>
+        </fieldset>
+        <button onclick="generatePassword()">Generate Password</button>
+        <p id="password">Your password will appear here...</p>
+    </div>
+</body>
+</html>
