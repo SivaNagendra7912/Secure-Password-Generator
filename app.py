@@ -1,173 +1,118 @@
 from flask import Flask, render_template, request, jsonify
 import random
 import string
-from collections import defaultdict
+import secrets
+from flask_cors import CORS
 
 app = Flask(__name__)
-
-def generate_password(length=12, options=None):
-    if options is None:
-        options = {}
-    
-    # Validate length
-    if length < 8:
-        return "Password must be at least 8 characters long."
-    if length > 32:
-        return "Maximum allowed length is 32 characters."
-
-    # Define all possible character sets with their types
-    char_sets = {
-        'lower': ('abcdefghijklmnopqrstuvwxyz', 'letter'),
-        'upper': ('ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'letter'),
-        'digits': ('0123456789', 'digit'),
-        'math': ('+-×÷=≠≈<>≤≥', 'symbol'),
-        'currency': ('$€¥£¢₽₹', 'symbol'),
-        'punctuation': (string.punctuation, 'symbol'),
-        'greek': ('αβγδεζηθικλμνξοπρστυφχψω', 'letter'),
-        'ascii_art': ('─│┌┐└┘├┤┬┴┼', 'symbol'),
-        'brackets': ('()[]{}<>', 'symbol')
-    }
-
-    # Determine which character sets to use based on options
-    selected_sets = {}
-    required_types = set()
-    
-    # Always include letters (both cases)
-    selected_sets['lower'] = char_sets['lower']
-    selected_sets['upper'] = char_sets['upper']
-    required_types.add('letter')
-    
-    # Include other sets based on options
-    if options.get('use_digits'):
-        selected_sets['digits'] = char_sets['digits']
-        required_types.add('digit')
-    if options.get('use_math_symbols'):
-        selected_sets['math'] = char_sets['math']
-        required_types.add('symbol')
-    if options.get('use_currency'):
-        selected_sets['currency'] = char_sets['currency']
-        required_types.add('symbol')
-    if options.get('use_punctuation'):
-        selected_sets['punctuation'] = char_sets['punctuation']
-        required_types.add('symbol')
-    if options.get('use_greek_letters'):
-        selected_sets['greek'] = char_sets['greek']
-        required_types.add('letter')
-    if options.get('use_ascii_art'):
-        selected_sets['ascii_art'] = char_sets['ascii_art']
-        required_types.add('symbol')
-    if options.get('use_brackets'):
-        selected_sets['brackets'] = char_sets['brackets']
-        required_types.add('symbol')
-
-    if not selected_sets:
-        return "Please select at least one character type."
-
-    # Leet speak substitutions
-    leet_mapping = {
-        'a': '4', 'e': '3', 'i': '1', 'o': '0', 's': '5', 't': '7',
-        'A': '4', 'E': '3', 'I': '1', 'O': '0', 'S': '5', 'T': '7'
-    }
-
-    # Generate password ensuring proper distribution
-    password = []
-    char_counts = defaultdict(int)
-    type_counts = defaultdict(int)
-    
-    # First pass: include at least one character from each selected set
-    for set_name, (chars, char_type) in selected_sets.items():
-        char = random.choice(chars)
-        
-        # Apply leet speak if enabled and applicable
-        if options.get('use_leet_speak') and char in leet_mapping and random.random() < 0.3:
-            char = leet_mapping[char]
-        
-        password.append(char)
-        char_counts[set_name] += 1
-        type_counts[char_type] += 1
-
-    # Second pass: fill remaining length with balanced distribution
-    while len(password) < length:
-        # Calculate weights for each set based on current distribution
-        weights = {}
-        total_weight = 0
-        for set_name, (chars, char_type) in selected_sets.items():
-            # Give higher weight to sets that are underrepresented
-            weight = max(1, (len(password) / len(selected_sets)) - char_counts[set_name])
-            weights[set_name] = weight
-            total_weight += weight
-        
-        # Select a character set based on weights
-        rand = random.uniform(0, total_weight)
-        current = 0
-        selected_set = None
-        for set_name, weight in weights.items():
-            current += weight
-            if rand <= current:
-                selected_set = set_name
-                break
-        
-        if selected_set is None:
-            selected_set = random.choice(list(selected_sets.keys()))
-        
-        # Select a character from the chosen set
-        chars, char_type = selected_sets[selected_set]
-        char = random.choice(chars)
-        
-        # Apply leet speak if enabled and applicable
-        if options.get('use_leet_speak') and char in leet_mapping and random.random() < 0.3:
-            char = leet_mapping[char]
-        
-        password.append(char)
-        char_counts[selected_set] += 1
-        type_counts[char_type] += 1
-
-    # Final shuffle to mix everything
-    random.shuffle(password)
-    
-    # Convert to string and ensure exact length
-    password_str = ''.join(password)[:length]
-    
-    # Final validation
-    if len(password_str) != length:
-        return f"Failed to generate password of length {length}"
-    
-    return password_str
+CORS(app)  # Enable CORS for development
 
 @app.route('/')
-def home():
+def index():
     return render_template('index.html')
 
 @app.route('/generate', methods=['POST'])
-def generate():
+def generate_password():
+    data = request.get_json()
+    
     try:
-        data = request.get_json()
-        length = int(data.get('length', 12))
+        length = int(data.get('length', 16))
+        uppercase = bool(data.get('uppercase', True))
+        lowercase = bool(data.get('lowercase', True))
+        numbers = bool(data.get('numbers', True))
+        symbols = bool(data.get('symbols', True))
         
-        # Get all options from the request
-        options = {
-            'use_digits': bool(data.get('use_digits', False)),
-            'use_math_symbols': bool(data.get('use_math_symbols', False)),
-            'use_currency': bool(data.get('use_currency', False)),
-            'use_punctuation': bool(data.get('use_punctuation', False)),
-            'use_greek_letters': bool(data.get('use_greek_letters', False)),
-            'use_ascii_art': bool(data.get('use_ascii_art', False)),
-            'use_leet_speak': bool(data.get('use_leet_speak', False)),
-            'use_brackets': bool(data.get('use_brackets', False))
-        }
-
-        password = generate_password(length, options)
+        # Validate length
+        if length < 8 or length > 64:
+            return jsonify({
+                'error': 'Password length must be between 8 and 64 characters',
+                'status': 'error'
+            }), 400
         
-        if isinstance(password, str) and any(
-            password.startswith(prefix) 
-            for prefix in ["Password must be", "Please select", "Maximum allowed", "Failed to generate"]
-        ):
-            return jsonify({'error': password}), 400
-
-        return jsonify({'password': password})
-
+        # Validate at least one character type is selected
+        if not any([uppercase, lowercase, numbers, symbols]):
+            return jsonify({
+                'error': 'Please select at least one character type',
+                'status': 'error'
+            }), 400
+        
+        # Define character sets
+        char_sets = []
+        if uppercase:
+            char_sets.append(string.ascii_uppercase)
+        if lowercase:
+            char_sets.append(string.ascii_lowercase)
+        if numbers:
+            char_sets.append(string.digits)
+        if symbols:
+            char_sets.append('!@#$%^&*()_+-=[]{}|;:,.<>?')
+        
+        # Ensure at least one character from each selected set is included
+        password = []
+        for char_set in char_sets:
+            password.append(secrets.choice(char_set))
+        
+        # Fill the rest of the password
+        all_chars = ''.join(char_sets)
+        password.extend(secrets.choice(all_chars) for _ in range(length - len(password)))
+        
+        # Shuffle the password
+        random.shuffle(password)
+        password = ''.join(password)
+        
+        # Calculate password strength
+        strength = calculate_strength(password)
+        
+        return jsonify({
+            'password': password,
+            'status': 'success',
+            'strength': strength
+        })
+        
     except Exception as e:
-        return jsonify({'error': f'An error occurred: {str(e)}'}), 500
+        return jsonify({
+            'error': str(e),
+            'status': 'error'
+        }), 500
+
+def calculate_strength(password):
+    """Calculate password strength metrics"""
+    length = len(password)
+    has_upper = any(c.isupper() for c in password)
+    has_lower = any(c.islower() for c in password)
+    has_digit = any(c.isdigit() for c in password)
+    has_symbol = any(not c.isalnum() for c in password)
+    
+    # Complexity score (0-100)
+    complexity = 0
+    
+    # Length contributes up to 50 points
+    complexity += min(50, (length / 64) * 50)
+    
+    # Character variety contributes up to 50 points
+    variety_score = 0
+    if has_upper: variety_score += 10
+    if has_lower: variety_score += 10
+    if has_digit: variety_score += 10
+    if has_symbol: variety_score += 20
+    
+    complexity += variety_score
+    
+    # Cap at 100
+    complexity = min(100, complexity)
+    
+    # Determine strength level
+    if complexity < 30:
+        strength_level = 'Weak'
+    elif complexity < 70:
+        strength_level = 'Moderate'
+    else:
+        strength_level = 'Strong'
+    
+    return {
+        'score': complexity,
+        'level': strength_level
+    }
 
 if __name__ == '__main__':
     app.run(debug=True)
